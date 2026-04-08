@@ -1,0 +1,13 @@
+unique_ids:
+  assets:
+    standard-page.html: IBTRKCYXF4HMGWQOZSLUQBPBVQY4KZ2M
+    theme.css: AYUUYVYJJCXUWBGUKC7Z2QLF7MA5JZXK
+  forms:
+    Form1: OVAPTTYJN4UCBLEJACYJET6GXVOYRRCG
+    Form1.Anmelden: '1775637321428196492697637.9212'
+    Form1.Anmelden.RowTemplate2: '1775637333412651298648564.0641'
+    Form1.RowTemplate1: '1775637226028374430719504.42175'
+  modules: {}
+  scripts: {}
+  server_modules:
+    Backend: '177563749179549347110854.89485'

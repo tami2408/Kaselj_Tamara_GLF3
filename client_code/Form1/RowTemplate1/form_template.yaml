@@ -1,0 +1,8 @@
+components:
+- event_bindings: {}
+  layout_properties: {column: GBBAIP}
+  name: button_1
+  properties: {text: Anmelden}
+  type: Button
+container: {type: DataRowPanel}
+is_package: true

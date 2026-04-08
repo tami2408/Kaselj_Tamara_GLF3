@@ -1,0 +1,14 @@
+components:
+- components:
+  - name: repeating_panel_1
+    properties: {item_template: Form1.Anmelden.RowTemplate2}
+    type: RepeatingPanel
+  layout_properties: {grid_position: 'SPKWBX,GPYGPK'}
+  name: data_grid_1
+  properties:
+    columns:
+    - {data_key: column_1, id: JKSDUP, title: Mitglied}
+    - {data_key: column_2, id: VJQQOR, title: Anmelden}
+  type: DataGrid
+container: {type: ColumnPanel}
+is_package: true
