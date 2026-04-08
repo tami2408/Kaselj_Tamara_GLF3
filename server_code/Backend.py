@@ -1,45 +1,58 @@
 import anvil.server
-from anvil.files import data_files
 import sqlite3
 import datetime
 
-DB_NAME = "Seeberger_Jakob_fitnessstudio.db"
+DB_NAME = "Kaselj_Tamara_fitnessstudio.db"
 
 
-def db_lesen():
-  return sqlite3.connect(data_files[DB_NAME])
+def get_connection():
+  return sqlite3.connect(DB_NAME)
 
 
 @anvil.server.callable
 def get_kurse():
-  conn = db_lesen()
+  conn = get_connection()
   conn.row_factory = sqlite3.Row
-  cur = conn.cursor()
+  cursor = conn.cursor()
 
-  cur.execute("""
-    SELECT
-      k.kurs_id,
-      k.bezeichnung,
-      k.wochentag,
-      k.uhrzeit,
-      t.vorname || ' ' || t.nachname AS trainer_name,
-      COUNT(a.anmeldung_id) AS teilnehmerzahl
-    FROM kurse k
-    JOIN trainer t ON k.trainer_id = t.trainer_id
-    LEFT JOIN anmeldung a ON a.kurs_id = k.kurs_id
-    GROUP BY k.kurs_id, k.bezeichnung, k.wochentag, k.uhrzeit, trainer_name
-    ORDER BY k.wochentag, k.uhrzeit, k.bezeichnung
-  """)
+  cursor.execute("""
+        SELECT 
+            k.KID,
+            k.Bezeichnung AS kursname,
+            k.Wochentag,
+            k.Uhrzeit,
+            k.MaxTeilnehmer,
+            t.Vorname || ' ' || t.Nachname AS trainername,
+            COUNT(a.MID) AS teilnehmer_anzahl
+        FROM Kurse k
+        JOIN Trainer t ON k.TID = t.TID
+        LEFT JOIN anmelden a ON k.KID = a.KID
+        GROUP BY k.KID, k.Bezeichnung, k.Wochentag, k.Uhrzeit, k.MaxTeilnehmer, trainername
+        ORDER BY
+            CASE k.Wochentag
+                WHEN 'Montag' THEN 1
+                WHEN 'Dienstag' THEN 2
+                WHEN 'Mittwoch' THEN 3
+                WHEN 'Donnerstag' THEN 4
+                WHEN 'Freitag' THEN 5
+                WHEN 'Samstag' THEN 6
+                WHEN 'Sonntag' THEN 7
+                ELSE 99
+            END,
+            k.Uhrzeit
+    """)
 
   daten = []
-  for row in cur.fetchall():
+  for row in cursor.fetchall():
     daten.append({
-      "Kurse": row["bezeichnung"],
-      "Wochentag": row["wochentag"],
-      "Uhrzeit": row["uhrzeit"],
-      "Trainer": row["trainer_name"],
-      "Teilnehmer": str(row["teilnehmerzahl"]),
-      "kurs_id": row["kurs_id"]
+      "KID": row["KID"],
+      "kursname": row["kursname"],
+      "wochentag": row["Wochentag"],
+      "uhrzeit": row["Uhrzeit"],
+      "trainername": row["trainername"],
+      "teilnehmer_text": f"{row['teilnehmer_anzahl']}/{row['MaxTeilnehmer']}",
+      "teilnehmer_anzahl": row["teilnehmer_anzahl"],
+      "max_teilnehmer": row["MaxTeilnehmer"]
     })
 
   conn.close()
@@ -48,102 +61,106 @@ def get_kurse():
 
 @anvil.server.callable
 def get_mitglieder():
-  conn = db_lesen()
+  conn = get_connection()
   conn.row_factory = sqlite3.Row
-  cur = conn.cursor()
+  cursor = conn.cursor()
 
-  cur.execute("""
-    SELECT mitglied_id, vorname, nachname
-    FROM mitglieder
-    ORDER BY nachname, vorname
-  """)
+  cursor.execute("""
+        SELECT MID, Vorname, Nachname, Email, Beitrittsdatum
+        FROM Mitglieder
+        ORDER BY Nachname, Vorname
+    """)
 
-  daten = [
-    (f"{row['vorname']} {row['nachname']}", row["mitglied_id"])
-    for row in cur.fetchall()
-  ]
+  daten = []
+  for row in cursor.fetchall():
+    daten.append({
+      "MID": row["MID"],
+      "name": f"{row['Nachname']} {row['Vorname']}",
+      "vorname": row["Vorname"],
+      "nachname": row["Nachname"],
+      "email": row["Email"],
+      "beitrittsdatum": row["Beitrittsdatum"]
+    })
 
   conn.close()
   return daten
 
 
 @anvil.server.callable
-def anmelden(mitglied_id, kurs_id):
-  if mitglied_id is None:
-    raise Exception("Bitte ein Mitglied auswählen.")
-  if kurs_id is None:
-    raise Exception("Kein Kurs ausgewählt.")
-
-  with data_files.editing(DB_NAME) as db_path:
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-
-    cur.execute("""
-      SELECT COUNT(*) AS anzahl
-      FROM anmeldung
-      WHERE mitglied_id = ? AND kurs_id = ?
-    """, (mitglied_id, kurs_id))
-    schon_da = cur.fetchone()["anzahl"]
-
-    if schon_da > 0:
-      conn.close()
-      raise Exception("Dieses Mitglied ist bereits angemeldet.")
-
-    cur.execute("""
-      SELECT max_teilnehmer
-      FROM kurse
-      WHERE kurs_id = ?
-    """, (kurs_id,))
-    kurs = cur.fetchone()
-
-    if kurs is None:
-      conn.close()
-      raise Exception("Kurs nicht gefunden.")
-
-    max_teilnehmer = kurs["max_teilnehmer"]
-
-    cur.execute("""
-      SELECT COUNT(*) AS anzahl
-      FROM anmeldung
-      WHERE kurs_id = ?
-    """, (kurs_id,))
-    aktuelle_anzahl = cur.fetchone()["anzahl"]
-
-    if aktuelle_anzahl >= max_teilnehmer:
-      conn.close()
-      raise Exception("Dieser Kurs ist bereits voll.")
-
-    cur.execute("""
-      INSERT INTO anmeldung (mitglied_id, kurs_id, anmeldedatum)
-      VALUES (?, ?, ?)
-    """, (
-      mitglied_id,
-      kurs_id,
-      datetime.date.today().isoformat()
-    ))
-
-    conn.commit()
-    conn.close()
-
-  return True
-
-
-# optional: Mitglieder eines Kurses anzeigen
-@anvil.server.callable
-def get_mitglieder_im_kurs(kurs_id):
-  conn = db_lesen()
+def kurs_anmelden(mid, kid):
+  conn = get_connection()
   conn.row_factory = sqlite3.Row
-  cur = conn.cursor()
+  cursor = conn.cursor()
 
-  cur.execute("""
-    SELECT m.vorname, m.nachname
-    FROM anmeldung a
-    JOIN mitglieder m ON a.mitglied_id = m.mitglied_id
-    WHERE a.kurs_id = ?
-    ORDER BY m.nachname, m.vorname
-  """, (kurs_id,))
+  # Prüfen: schon angemeldet?
+  cursor.execute("""
+        SELECT 1
+        FROM anmelden
+        WHERE MID = ? AND KID = ?
+    """, (mid, kid))
+  vorhanden = cursor.fetchone()
 
-  daten = [f"{row['vorname']} {row['nachname']}" for row in cur.fetchall()]
+  if vorhanden:
+    conn.close()
+    return "Dieses Mitglied ist bereits für den Kurs angemeldet."
+
+  # max Teilnehmer prüfen
+  cursor.execute("""
+        SELECT MaxTeilnehmer
+        FROM Kurse
+        WHERE KID = ?
+    """, (kid,))
+  kurs = cursor.fetchone()
+
+  cursor.execute("""
+        SELECT COUNT(*) AS anzahl
+        FROM anmelden
+        WHERE KID = ?
+    """, (kid,))
+  anzahl = cursor.fetchone()["anzahl"]
+
+  if anzahl >= kurs["MaxTeilnehmer"]:
+    conn.close()
+    return "Der Kurs ist bereits voll."
+
+  heute = datetime.date.today().isoformat()
+
+  cursor.execute("""
+        INSERT INTO anmelden (MID, KID, Anmeldedatum)
+        VALUES (?, ?, ?)
+    """, (mid, kid, heute))
+
+  conn.commit()
+  conn.close()
+
+  return "Anmeldung erfolgreich."
+
+
+@anvil.server.callable
+def get_mitglieder_fuer_kurs(kid):
+  conn = get_connection()
+  conn.row_factory = sqlite3.Row
+  cursor = conn.cursor()
+
+  cursor.execute("""
+        SELECT 
+            m.Vorname,
+            m.Nachname,
+            m.Email,
+            a.Anmeldedatum
+        FROM anmelden a
+        JOIN Mitglieder m ON a.MID = m.MID
+        WHERE a.KID = ?
+        ORDER BY m.Nachname, m.Vorname
+    """, (kid,))
+
+  daten = []
+  for row in cursor.fetchall():
+    daten.append({
+      "name": f"{row['Nachname']} {row['Vorname']}",
+      "email": row["Email"],
+      "anmeldedatum": row["Anmeldedatum"]
+    })
+
   conn.close()
   return daten

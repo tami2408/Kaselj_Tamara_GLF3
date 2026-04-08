@@ -19,7 +19,7 @@ db_schema:
     server: full
     title: Files
 dependencies: []
-name: Clone of Material Design 1
+name: Fitnessstudio
 package_name: Material_Design_1
 runtime_options:
   client_version: '3'
